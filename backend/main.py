@@ -1,105 +1,119 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from openai import OpenAI
-import os
-import json
-from dotenv import load_dotenv
+"""
+AI Trip Planner — FastAPI Backend
+Multi-agent itinerary generation with LangGraph, RAG (ChromaDB), and LangSmith observability.
+"""
 
-load_dotenv()
+import os
+import time
+import hashlib
+import json
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+
+from .config import get_settings
+from .schemas import TripRequest, TripResponse
+from .agents.graph import run_trip_pipeline
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
+
+# Configure LangSmith tracing via environment
+os.environ["LANGCHAIN_TRACING_V2"] = str(settings.langchain_tracing_v2).lower()
+os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
+os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
+os.environ["OPENAI_API_KEY"] = settings.openai_api_key
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Warm up ChromaDB on startup
+    try:
+        from .rag.vectorstore import get_collection
+        get_collection()
+        logger.info("ChromaDB collection ready")
+    except Exception as e:
+        logger.warning(f"ChromaDB warmup failed: {e}")
+    yield
+
 
 app = FastAPI(
     title="AI Trip Planner API",
-    description="Generate personalized travel itineraries using OpenAI",
-    version="1.0.0",
+    description=(
+        "Multi-agent travel itinerary generation powered by LangGraph, "
+        "RAG with ChromaDB, and LangSmith observability."
+    ),
+    version="2.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# In-memory cache (swap for Redis in production)
+_cache: dict[str, dict] = {}
 
-class ItineraryRequest(BaseModel):
-    destination: str = Field(..., min_length=2, max_length=100, example="Tokyo, Japan")
-    budget: float = Field(..., gt=0, le=100000, example=1500)
-    duration: int = Field(..., ge=1, le=30, example=5)
-    interests: list[str] = Field(..., min_length=1, example=["Culture & History", "Food & Cuisine"])
+
+def _cache_key(req: TripRequest) -> str:
+    payload = f"{req.destination}:{req.budget}:{req.duration}:{sorted(req.interests)}:{req.travel_style}"
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
 @app.get("/")
 def root():
-    return {"message": "AI Trip Planner API", "version": "1.0.0", "docs": "/docs"}
+    return {
+        "service": "AI Trip Planner API",
+        "version": "2.0.0",
+        "agents": ["ResearchAgent", "ItineraryAgent", "BudgetAgent", "ReviewAgent"],
+        "features": ["LangGraph multi-agent", "ChromaDB RAG", "LangSmith tracing"],
+        "docs": "/docs",
+    }
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "environment": settings.app_env}
 
 
 @app.post("/generate-itinerary")
-def generate_itinerary(request: ItineraryRequest):
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+async def generate_itinerary(request: TripRequest):
+    cache_key = _cache_key(request)
 
-    client = OpenAI(api_key=api_key)
+    if cache_key in _cache:
+        logger.info(f"Cache hit for {request.destination}")
+        return {**_cache[cache_key], "cached": True}
 
-    prompt = f"""Create a detailed day-by-day travel itinerary.
-
-Destination: {request.destination}
-Total Budget: ${request.budget:.0f} USD
-Duration: {request.duration} days
-Interests: {', '.join(request.interests)}
-
-Return ONLY valid JSON with this structure:
-{{
-  "destination": "City, Country",
-  "summary": "2-3 sentence trip overview",
-  "total_estimated_cost": <number>,
-  "days": [
-    {{
-      "day": <number>,
-      "theme": "Day theme",
-      "morning": {{"activity": "...", "description": "...", "duration": "X hours", "cost": <number>}},
-      "afternoon": {{"activity": "...", "description": "...", "duration": "X hours", "cost": <number>}},
-      "evening": {{"activity": "...", "description": "...", "duration": "X hours", "cost": <number>}},
-      "meals": {{"breakfast": "suggestion ~$X", "lunch": "suggestion ~$X", "dinner": "suggestion ~$X"}},
-      "daily_cost_estimate": <number>,
-      "pro_tip": "One practical tip"
-    }}
-  ],
-  "packing_essentials": ["item1", "item2", "item3", "item4", "item5"],
-  "best_time_to_visit": "Month range and why",
-  "getting_around": "Local transport advice",
-  "money_saving_tips": ["tip1", "tip2", "tip3"],
-  "emergency_contacts": {{
-    "local_emergency": "number",
-    "tourist_helpline": "number or advice",
-    "nearest_hospital": "general advice"
-  }}
-}}"""
-
+    start = time.time()
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert travel planner. Always return valid JSON.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.7,
-            max_tokens=4000,
+        itinerary = run_trip_pipeline(
+            destination=request.destination,
+            budget=request.budget,
+            duration=request.duration,
+            interests=request.interests,
+            travel_style=request.travel_style,
         )
-        return json.loads(response.choices[0].message.content)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"OpenAI error: {exc}")
+    except Exception as e:
+        logger.error(f"Pipeline failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Trip planning pipeline error: {str(e)}")
+
+    elapsed_ms = int((time.time() - start) * 1000)
+    response = {
+        "itinerary": itinerary,
+        "cached": False,
+        "generation_time_ms": elapsed_ms,
+    }
+    _cache[cache_key] = response
+    return response
 
 
 if __name__ == "__main__":
