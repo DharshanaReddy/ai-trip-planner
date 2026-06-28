@@ -28,7 +28,6 @@ os.environ["LANGCHAIN_TRACING_V2"] = str(settings.langchain_tracing_v2).lower()
 os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
 os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
 os.environ["LANGCHAIN_ENDPOINT"] = settings.langchain_endpoint
-os.environ["OPENAI_API_KEY"] = settings.openai_api_key
 
 
 @asynccontextmanager
@@ -49,7 +48,7 @@ app = FastAPI(
         "Multi-agent travel itinerary generation powered by LangGraph, "
         "RAG with ChromaDB, and LangSmith observability."
     ),
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -73,7 +72,7 @@ def _cache_key(req: TripRequest) -> str:
 def root():
     return {
         "service": "AI Trip Planner API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "agents": ["ResearchAgent", "ItineraryAgent", "BudgetAgent", "ReviewAgent"],
         "features": ["LangGraph multi-agent", "ChromaDB RAG", "LangSmith tracing"],
         "docs": "/docs",
@@ -82,7 +81,32 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "environment": settings.app_env}
+    return {"status": "healthy", "version": "2.1.0", "environment": settings.app_env}
+
+
+POPULAR_DESTINATIONS = [
+    {"destination": "Kyoto, Japan", "region": "Asia", "avg_budget_7d": 1800, "best_month": "April", "tags": ["culture", "temples", "food"]},
+    {"destination": "Barcelona, Spain", "region": "Europe", "avg_budget_7d": 1400, "best_month": "May", "tags": ["architecture", "beach", "nightlife"]},
+    {"destination": "Bali, Indonesia", "region": "Asia", "avg_budget_7d": 900, "best_month": "July", "tags": ["nature", "wellness", "adventure"]},
+    {"destination": "New York City, USA", "region": "Americas", "avg_budget_7d": 2200, "best_month": "October", "tags": ["culture", "food", "art"]},
+    {"destination": "Cape Town, South Africa", "region": "Africa", "avg_budget_7d": 1300, "best_month": "March", "tags": ["nature", "adventure", "wildlife"]},
+    {"destination": "Marrakech, Morocco", "region": "Africa", "avg_budget_7d": 800, "best_month": "April", "tags": ["culture", "food", "markets"]},
+    {"destination": "Queenstown, New Zealand", "region": "Oceania", "avg_budget_7d": 1900, "best_month": "February", "tags": ["adventure", "nature", "skiing"]},
+    {"destination": "Lisbon, Portugal", "region": "Europe", "avg_budget_7d": 1100, "best_month": "June", "tags": ["history", "food", "music"]},
+    {"destination": "Medellín, Colombia", "region": "Americas", "avg_budget_7d": 700, "best_month": "February", "tags": ["culture", "food", "nightlife"]},
+    {"destination": "Jordan (Petra + Wadi Rum)", "region": "Middle East", "avg_budget_7d": 1500, "best_month": "March", "tags": ["history", "adventure", "desert"]},
+]
+
+
+@app.get("/destinations/popular")
+def popular_destinations(region: str | None = None, max_budget: float | None = None):
+    """Return curated popular destinations, optionally filtered by region or budget."""
+    results = POPULAR_DESTINATIONS
+    if region:
+        results = [d for d in results if d["region"].lower() == region.lower()]
+    if max_budget:
+        results = [d for d in results if d["avg_budget_7d"] <= max_budget]
+    return {"count": len(results), "destinations": results}
 
 
 @app.post("/generate-itinerary")
