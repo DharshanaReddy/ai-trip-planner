@@ -6,18 +6,24 @@ Traced end-to-end with LangSmith for observability.
 import json
 import logging
 import re
-from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+import time
+from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage, SystemMessage
 from langsmith import traceable
 
 from .state import TripState
 from ..rag.vectorstore import retrieve_context
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
+MAX_RETRIES = 3
+RETRY_DELAY = 2.0
 
-def _llm(temperature: float = 0.5) -> ChatOpenAI:
-    return ChatOpenAI(model="gpt-4o-mini", temperature=temperature)
+
+def _llm(temperature: float = 0.5) -> ChatGroq:
+    settings = get_settings()
+    return ChatGroq(model=settings.groq_model, temperature=temperature, api_key=settings.groq_api_key)
 
 
 def _parse_json(text: str) -> dict:
@@ -27,6 +33,21 @@ def _parse_json(text: str) -> dict:
     except Exception as e:
         logger.error(f"JSON parse error: {e}")
         return {}
+
+
+def _invoke_with_retry(llm: ChatGroq, messages: list, label: str = "agent") -> str:
+    """Invoke LLM with exponential backoff retry on transient errors."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return llm.invoke(messages).content
+        except Exception as e:
+            if attempt == MAX_RETRIES:
+                logger.error(f"{label} failed after {MAX_RETRIES} attempts: {e}")
+                raise
+            wait = RETRY_DELAY * (2 ** (attempt - 1))
+            logger.warning(f"{label} attempt {attempt} failed ({e}), retrying in {wait:.1f}s")
+            time.sleep(wait)
+    return ""
 
 
 @traceable(name="research-agent")
@@ -41,7 +62,7 @@ def research_node(state: TripState) -> dict:
         f"{destination} travel tips budget safety transport culture food"
     )
 
-    response = _llm(temperature=0.3).invoke([
+    content = _invoke_with_retry(_llm(temperature=0.3), [
         SystemMessage(content=(
             "You are a senior travel researcher with expertise across all global destinations. "
             "Synthesize the provided knowledge base context with your expertise to produce "
@@ -62,9 +83,9 @@ Provide a concise research brief covering:
 5. Money-saving insider tips specific to {destination}
 6. Seasonal considerations for timing this trip
 7. Hidden gems that match the stated interests"""),
-    ])
+    ], label="research-agent")
 
-    return {"research_context": response.content, "errors": []}
+    return {"research_context": content, "errors": []}
 
 
 @traceable(name="itinerary-agent")
@@ -73,7 +94,7 @@ def itinerary_node(state: TripState) -> dict:
     ItineraryAgent: generates a structured, day-by-day itinerary grounded in research context.
     Uses few-shot JSON output format for reliable parsing.
     """
-    response = _llm(temperature=0.7).invoke([
+    content = _invoke_with_retry(_llm(temperature=0.7), [
         SystemMessage(content=(
             "You are an expert travel planner who creates detailed, immersive itineraries. "
             "Always respond with a single valid JSON object — no markdown, no explanation."
@@ -138,9 +159,9 @@ Return this exact JSON structure:
     "embassy_tip": "how to find your country's embassy"
   }}
 }}"""),
-    ])
+    ], label="itinerary-agent")
 
-    draft = _parse_json(response.content)
+    draft = _parse_json(content)
     if not draft:
         return {"draft_itinerary": {}, "errors": state.get("errors", []) + ["Itinerary generation failed"]}
     return {"draft_itinerary": draft, "errors": state.get("errors", [])}
@@ -156,7 +177,7 @@ def budget_node(state: TripState) -> dict:
     days = draft.get("days", [])
     estimated_total = sum(d.get("daily_total", 0) for d in days)
 
-    response = _llm(temperature=0.2).invoke([
+    content = _invoke_with_retry(_llm(temperature=0.2), [
         SystemMessage(content=(
             "You are a travel finance analyst. Provide accurate budget analysis. "
             "Always respond with a single valid JSON object."
@@ -192,9 +213,9 @@ Return this JSON:
     "Booking platform tip"
   ]
 }}"""),
-    ])
+    ], label="budget-agent")
 
-    budget_analysis = _parse_json(response.content)
+    budget_analysis = _parse_json(content)
     if not budget_analysis:
         budget_analysis = {
             "total_estimate": estimated_total,
