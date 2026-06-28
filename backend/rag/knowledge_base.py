@@ -133,4 +133,59 @@ TRAVEL_DOCUMENTS = [
         - Meditation apps help with travel anxiety and adjusting to new environments""",
         "metadata": {"category": "wellness", "type": "general"},
     },
+    {
+        "id": "middle-east-travel-001",
+        "content": """Middle East travel insights:
+        - UAE (Dubai/Abu Dhabi): ultramodern, safe, expensive — budget $200-300/day
+        - Jordan: Petra, Wadi Rum, and the Dead Sea; visa on arrival for most nationalities
+        - Morocco: medinas of Marrakech, Fez, Chefchaouen; budget $50-80/day; bargaining expected
+        - Israel: tight security at borders/airports; budget $120-180/day; diverse food scene
+        - Oman: underrated gem — safe, stunning landscapes, hospitable; budget $80-120/day
+        - Dress code: modest clothing essential; shoulders and knees covered in public areas
+        - Ramadan: some restaurants close during the day; respectful silence during prayer times
+        - Currency: carry USD or EUR as backup; exchange at official bureaux de change""",
+        "metadata": {"category": "destination", "region": "middle-east"},
+    },
+    {
+        "id": "africa-travel-001",
+        "content": """Africa travel insights:
+        - Kenya/Tanzania: best safari destination; Great Migration July-October; budget $150-400/day
+        - South Africa: Cape Town + Garden Route + Kruger Park trifecta; budget $80-150/day
+        - Morocco: northern Africa's most accessible destination (see middle-east doc)
+        - Egypt: Pyramids, Luxor, Nile cruise; budget $60-100/day; negotiate firmly for prices
+        - Rwanda: gorilla trekking ($1,500 permit); fastest-developing country in Africa
+        - Ethiopia: ancient churches, unique cuisine, affordable; budget $40-70/day
+        - Visa: East Africa Tourist Visa covers Kenya+Uganda+Rwanda; South Africa is visa-free for many
+        - Health: yellow fever vaccination required for many African countries
+        - Safety: varies enormously by country and region — research specific areas carefully""",
+        "metadata": {"category": "destination", "region": "africa"},
+    },
+    {
+        "id": "oceania-travel-001",
+        "content": """Oceania travel insights:
+        - Australia: expensive ($150-250/day); Working Holiday Visa popular for long stays
+        - New Zealand: stunning landscapes, adventure capital; budget $120-200/day
+        - Bali (Indonesia): budget paradise $40-80/day; Ubud for culture, Seminyak for beach
+        - Fiji: couples/honeymoon paradise; budget $100-200/day; outer islands much cheaper
+        - Thailand (technically SE Asia but Pacific-adjacent): unbeatable value $40-70/day
+        - Best time: April-October for Australia's east coast; dry season for tropical areas
+        - Flight tip: open-jaw tickets (fly into Sydney, out of Auckland) save backtracking
+        - Australia internal flights: Rex Airlines and Bonza offer budget routes beyond the majors
+        - New Zealand: campervan rental is the classic way to see both islands""",
+        "metadata": {"category": "destination", "region": "oceania"},
+    },
+    {
+        "id": "sustainable-travel-001",
+        "content": """Sustainable and responsible travel practices:
+        - Carbon offset: calculate flight emissions and offset via Gold Standard or Atmosfair
+        - Accommodation: look for Green Key, Rainforest Alliance, or B-Corp certified properties
+        - Wildlife: avoid attractions using captive animals for entertainment or photos
+        - Plastic: carry reusable bag, water bottle, cutlery; refuse unnecessary packaging
+        - Local economy: eat at locally-owned restaurants; buy souvenirs from local artisans
+        - Over-tourism: visit popular sites early morning or off-season; consider less-visited alternatives
+        - Voluntourism: vet organizations carefully — short-term orphanage visits often cause harm
+        - Photography: ask consent; never pay children for photos (creates perverse incentives)
+        - Tread lightly: stay on marked trails; don't remove natural materials from nature reserves""",
+        "metadata": {"category": "sustainability", "type": "general"},
+    },
 ]
