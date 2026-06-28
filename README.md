@@ -45,11 +45,11 @@ Streamlit Frontend
 
 ## Screenshots
 
-### Generated Itinerary
-![Generated Itinerary](docs/screenshots/itinerary.png)
+### Planning Interface — 4-agent pipeline form
+![Planning Interface](docs/screenshots/itinerary.png)
 
-### Budget Analytics Dashboard
-![Budget Analytics](docs/screenshots/budget_analytics.png)
+### API Reference — Swagger UI with all endpoints
+![API Docs](docs/screenshots/api_docs.png)
 
 ## Tech Stack
 
