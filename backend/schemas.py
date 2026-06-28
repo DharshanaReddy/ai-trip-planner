@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Literal
+
+VALID_TRAVEL_STYLES = {"budget", "balanced", "comfort", "luxury", "eco"}
 
 
 class TripRequest(BaseModel):
@@ -7,7 +9,19 @@ class TripRequest(BaseModel):
     budget: float = Field(..., gt=0, le=100000, example=2000)
     duration: int = Field(..., ge=1, le=30, example=7)
     interests: list[str] = Field(..., min_length=1, example=["Culture & History", "Food & Cuisine"])
-    travel_style: str = Field(default="balanced", example="budget/balanced/comfort")
+    travel_style: str = Field(default="balanced", example="budget/balanced/comfort/luxury/eco")
+
+    @field_validator("travel_style")
+    @classmethod
+    def validate_travel_style(cls, v: str) -> str:
+        if v.lower() not in VALID_TRAVEL_STYLES:
+            raise ValueError(f"travel_style must be one of: {', '.join(sorted(VALID_TRAVEL_STYLES))}")
+        return v.lower()
+
+    @field_validator("destination")
+    @classmethod
+    def clean_destination(cls, v: str) -> str:
+        return v.strip()
 
 
 class TimeSlot(BaseModel):
