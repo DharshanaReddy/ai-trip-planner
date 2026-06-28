@@ -14,3 +14,24 @@ build/
 .streamlit/secrets.toml
 *.db
 *.sqlite3
+
+# ChromaDB persistent storage
+chroma_db/
+chromadb/
+
+# LangSmith / LangChain cache
+.langchain/
+.langsmith/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
