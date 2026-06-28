@@ -48,10 +48,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def call_backend(payload: dict) -> dict | None:
+def call_backend(payload: dict, demo: bool = False) -> dict | None:
     try:
         with httpx.Client(timeout=120) as client:
-            r = client.post(f"{BACKEND}/generate-itinerary", json=payload)
+            url = f"{BACKEND}/generate-itinerary" + ("?demo=true" if demo else "")
+            r = client.post(url, json=payload)
             r.raise_for_status()
             return r.json()
     except httpx.ConnectError:
@@ -223,9 +224,9 @@ def main():
 
         travel_style = st.selectbox(
             "🎒 Travel Style",
-            ["budget", "balanced", "comfort"],
+            ["budget", "balanced", "comfort", "luxury", "eco"],
             index=1,
-            format_func=lambda x: {"budget": "🎒 Budget", "balanced": "⚖️ Balanced", "comfort": "✨ Comfort"}[x],
+            format_func=lambda x: {"budget": "🎒 Budget", "balanced": "⚖️ Balanced", "comfort": "✨ Comfort", "luxury": "💎 Luxury", "eco": "🌿 Eco"}[x],
         )
 
         interests = st.multiselect(
@@ -249,6 +250,21 @@ def main():
         st.markdown("2. 📋 ItineraryAgent")
         st.markdown("3. 💰 BudgetAgent")
         st.markdown("4. ✅ ReviewAgent")
+
+    # Demo mode — ?demo=true auto-loads a pre-built Kyoto itinerary
+    params = st.query_params
+    if params.get("demo") == "true" and "result" not in st.session_state:
+        with st.spinner("Loading demo itinerary..."):
+            result = call_backend({
+                "destination": "Kyoto, Japan",
+                "budget": 2000,
+                "duration": 5,
+                "interests": ["Culture & History", "Food & Cuisine"],
+                "travel_style": "balanced",
+            }, demo=True)
+        if result:
+            st.session_state["result"] = result
+            st.session_state["budget"] = 2000
 
     if go:
         with st.spinner("Running 4-agent pipeline... (Research → Plan → Budget → Review)"):

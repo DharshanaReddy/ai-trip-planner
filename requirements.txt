@@ -7,9 +7,11 @@ pydantic-settings>=2.3.0
 # LangChain ecosystem
 langchain>=0.2.6
 langchain-openai>=0.1.14
+langchain-groq>=0.1.6
 langchain-community>=0.2.6
 langgraph>=0.1.14
 langsmith>=0.1.77
+sentence-transformers>=3.0.0
 
 # Vector store (RAG)
 chromadb>=0.5.0

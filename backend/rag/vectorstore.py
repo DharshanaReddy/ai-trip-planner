@@ -1,26 +1,26 @@
 """
 ChromaDB vector store for travel knowledge retrieval.
-Uses OpenAI embeddings for semantic search over the knowledge base.
+Uses free local sentence-transformers embeddings (all-MiniLM-L6-v2).
 """
 
 import chromadb
 from chromadb.utils import embedding_functions
 from langsmith import traceable
-import os
 import logging
 from .knowledge_base import TRAVEL_DOCUMENTS
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_client: chromadb.Client | None = None
-_collection: chromadb.Collection | None = None
+_client: Optional[chromadb.ClientAPI] = None
+_collection: Optional[chromadb.Collection] = None
 COLLECTION_NAME = "travel_knowledge"
 
 
 def _get_embedding_fn():
-    return embedding_functions.OpenAIEmbeddingFunction(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model_name="text-embedding-3-small",
+    # Free local embeddings — no API key needed
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="all-MiniLM-L6-v2"
     )
 
 
